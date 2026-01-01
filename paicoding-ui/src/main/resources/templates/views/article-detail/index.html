@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+  <div th:replace="components/layout/header :: head(~{::title}, ~{}, ~{})">
+    <title th:text="${vo.article.title} + '-技术派'">技术派</title>
+  </div>
+
+  <link rel="stylesheet" href="/css/views/article-detail.css" th:href="${global.siteInfo.oss + '/css/views/article-detail.css'}" />
+  <script src="/js/marked.min.js" th:src="${global.siteInfo.oss + '/js/marked.min.js'}"></script>
+  <script src="/js/biz/selection.js" th:src="${global.siteInfo.oss + '/js/biz/selection.js'}"></script>
+  <script src="/js/biz/highlightcomment.js" th:src="${global.siteInfo.oss + '/js/biz/highlightcomment.js'}"></script>
+  <script src="/js/biz/ai-comment.js" th:src="${global.siteInfo.oss + '/js/biz/ai-comment.js'}"></script>
+  <script src="/js/biz/comment-markdown.js" th:src="${global.siteInfo.oss + '/js/biz/comment-markdown.js'}"></script>
+
+  <body id="body" class="bg-color">
+    <!-- 导航栏 -->
+    <div th:replace="components/layout/navbar :: navbar"></div>
+
+    <div class="home article-detail">
+      <div class="col-body pg-2-article">
+        <div class="com-3-layout">
+          <div class="layout-main">
+            <!-- 左边点赞、收藏、评论浮窗 -->
+            <div
+              th:replace="views/article-detail/side-float-action-bar/index :: tool_bar(${vo.article})"
+            ></div>
+
+            <!-- 正文 -->
+            <div
+              th:replace="components/article/article-detail :: article_info(${vo.article}, ${vo.author}, ${vo.other}, ${vo.payUsers})"
+            ></div>
+
+            <!--  评论  -->
+            <div id="commentDiv">
+              <div th:replace="views/article-detail/comment/index"></div>
+            </div>
+
+            <div
+              class="correlation-article bg-color-white"
+              id="relatedRecommend"
+            >
+              <!-- 关联推荐 -->
+              <h4 class="correlation-article-title">相关推荐</h4>
+              <div class="bg-color-white">
+                <div id="articleList"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="layout-side">
+            <!-- 用户相关信息 -->
+            <div
+              th:replace="components/user/user-card :: user_card(${vo.author}, ${vo.article.author}, ${global.isLogin})"
+            ></div>
+
+            <!-- 活动推荐 -->
+            <div th:if="${!#lists.isEmpty(vo.sideBarItems)}">
+              <div th:replace="views/article-detail/side-recommend-bar/index">
+                侧边通知板块
+              </div>
+            </div>
+            <div id="toc-container-position"></div>
+            <!-- 文章目录  -->
+            <div class="right-container toc-container">
+              <div class="widget">
+                <h3 class="com-nav-bar-title">目录</h3>
+                <div id="contentMenu" class="toc"></div>
+              </div>
+            </div>
+
+            <!-- 引用评论侧边栏 -->
+            <div id="quoteCommentSidebar" class="right-container quote-comment-sidebar" style="display: none;">
+              <div class="widget">
+                <h3 class="com-nav-bar-title">划词评论</h3>
+                <div class="quote-content">
+                  <div class="quote-text" id="quotedText"></div>
+                  <div class="quote-comment-form comment-input-container">
+                    <textarea id="quoteCommentInput" placeholder="写下您的评论..." class="form-control"></textarea>
+
+                    <div class="comment-toolbar">
+                      <div class="toolbar-left">
+                        <div class="ai-bot-selector" id="aiBotSelector">
+                          <button type="button" class="ai-bot-btn" id="aiBotBtn">
+                            🤖
+                          </button>
+                          <div class="ai-bot-dropdown" id="aiBotDropdown" style="top: 100%; bottom: auto;">
+                            <div class="ai-bot-option" data-bot="hater">杠精派</div>
+                            <div class="ai-bot-option" data-bot="smart">派聪明</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="toolbar-right">
+                        <span class="comment-count"><span id="commentCount">0</span>/512</span>
+                        <button id="submitQuoteComment" class="c-btn c-btn-primary mt-2" disabled>提交评论</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部信息 -->
+      <div th:replace="components/layout/footer :: footer"></div>
+    </div>
+
+    <!-- 左边点赞、收藏、评论浮窗 -->
+    <div
+      th:replace="views/article-detail/side-float-action-bar-md/index :: tool_bar(${vo.article})"
+    ></div>
+
+    <div class="modal fade" id="shareModal" tabindex="-1" role="dialog">
+      <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">分享文章</h5>
+            <button type="button" class="close" data-dismiss="modal">
+              <span>&times;</span>
+            </button>
+          </div>
+          <div class="modal-body text-center">
+            <div class="qrcode-container mb-3">
+              <img id="shareQrCode" src="" alt="分享二维码" style="width:200px;height:200px;">
+            </div>
+            <div class="short-url-container">
+              <div class="input-group">
+                <input type="text" id="shortUrl" class="form-control" readonly style="font-size: 1rem;">
+                <div class="input-group-append">
+                  <button class="btn btn-outline-secondary" type="button" onclick="copyAndClose()">复制</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 引用评论弹窗 (移动端) -->
+    <div class="modal fade" id="quoteCommentModal" tabindex="-1" role="dialog">
+      <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">引用评论</h5>
+            <button type="button" class="close" data-dismiss="modal">
+              <span>&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="quote-content">
+              <div class="quote-text" id="quotedTextModal"></div>
+              <div class="quote-comment-form">
+                <textarea id="quoteCommentInputModal" placeholder="写下您的评论..." class="form-control"></textarea>
+                <button id="submitQuoteCommentModal" class="c-btn c-btn-primary mt-2" disabled>提交评论</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script th:inline="javascript">
+      /*<![CDATA[*/
+      // 内容渲染
+      const articleId = [[${vo.article.articleId}]];
+
+      // 生成菜单
+      genTocMenu('#articleContent', '#contentMenu');
+
+      // 跳转到评论的地方
+      $("#commentFloatBtn,#commentFloatBtnMd").click(function () {
+          document.getElementById("commentList").scrollIntoView(true);
+      })
+
+      if (window.location.href.indexOf("#commentList") >= 0) {
+          document.getElementById("commentList").scrollIntoView(true);
+      }
+
+      // 点赞
+      let praisedCount = [[${vo.article.count.praiseCount}]]
+      let praised = [[${vo.article.praised}]]
+      const isLogin = [[${global.isLogin}]]
+      const currentUserId = isLogin ? [[${global.user != null ? global.user.userId: ''}]] : '';
+      const currentUserAvatar = isLogin ? [[${global.user != null ? global.user.photo: ''}]] : '';
+
+      // 为选中的文本添加下划线样式
+      const highlightComments = [[${vo.highlightComments}]];
+      console.log('highlightComments:', highlightComments)
+      if (highlightComments) {
+        // 初始化文章的下划线样式
+        initUnderlineToSelection(highlightComments);
+      }
+
+      function praiseFunc() {
+          if (!isLogin) {
+              // 未登录，不执行相关操作
+              return;
+          }
+
+          praised = !praised;
+
+          praiseArticle(articleId, praised, function (data) {
+              let avatarList = $('#praiseUsers')
+              if (praised) {
+                  // 点赞
+                  praisedCount += 1;
+                  $("#praiseFloatBtn, #praiseBtn, #praiseFloatBtnMd").addClass("active")
+
+                  // 添加当前点赞用户的头像
+                  avatarList.prepend('' +
+                      '            <a class="g-user-popover approval-img" href="/user/' + currentUserId + '">\n' +
+                      '                <img src="' + currentUserAvatar + '">\n' +
+                      '            </a>')
+              } else {
+                  // 取消点赞
+                  praisedCount -= 1;
+                  $("#praiseFloatBtn, #praiseBtn, #praiseFloatBtnMd").removeClass("active")
+
+                  // 移除当前点赞用户的头像
+                  let subItems = avatarList.children();
+                  for (let i = 0; i < subItems.length; i++) {
+                      let target = subItems[i];
+                      if (target.innerHTML.indexOf(currentUserAvatar) >= 0) {
+                          // 移除当前用户头像
+                          target.remove();
+                          break;
+                      }
+                  }
+              }
+
+
+              if (praisedCount > 0) {
+                  $("#praiseFloatBtn, #praiseFloatBtnMd").addClass("with-badge")
+                  $('#praiseFloatBtn, #praiseFloatBtnMd').attr("badge", praisedCount)
+                  $('#praiseDesc').text(String(praisedCount) + '人已点赞');
+
+              } else {
+                  $("#praiseFloatBtn, #praiseFloatBtnMd").removeClass("with-badge")
+                  $('#praiseFloatBtn, #praiseFloatBtnMd').removeAttr("badge")
+                  $('#praiseDesc').text('真诚点赞，诚不我欺');
+              }
+          });
+      }
+
+      // 点赞
+      $("#praiseFloatBtn, #praiseBtn, #praiseFloatBtnMd").on('click', function () {
+          praiseFunc();
+      });
+
+      // 收藏
+      let collectionCount = [[${vo.article.count.collectionCount}]]
+      let collected = [[${vo.article.collected}]]
+
+      $("#collectFloatBtn, #collectFloatBtnMd").click(function () {
+          if (!isLogin) {
+              // 未登录，不执行相关操作
+              return;
+          }
+
+          collected = !collected;
+          const curDom = $(this)
+          collectArticle(articleId, collected, function (data) {
+              if (collected) {
+                  // 点赞
+                  collectionCount += 1;
+                  curDom.addClass("active")
+              } else {
+                  collectionCount -= 1;
+                  curDom.removeClass("active")
+              }
+
+              if (collectionCount > 0) {
+                  curDom.addClass("with-badge")
+                  curDom.attr("badge", collectionCount)
+              } else {
+                  curDom.removeClass("with-badge")
+                  curDom.removeAttr("badge")
+              }
+          });
+      })
+
+
+      // 加载推荐列表
+      let params = {
+          "articleId": articleId,
+          "page": 1
+      }
+      loadMore("#articleList", "/article/api/recommend", params, "articleList", function() {
+        if($('#articleList:has(div)').length == 0) {
+          // 不存在推荐内容
+          $("#relatedRecommend").hide();
+        }
+      });
+
+      // 回到顶端
+      $.scrollUp({
+          animation: 'fade',
+          activeOverlay: '#00FFFF',
+          scrollImg: {
+              active: true,
+              type: 'background',
+              src: '/img/top.png'
+          }
+      });
+
+      function bindCommentInputEvent() {
+        // 直接评论
+        const commentContent = $("#commentContent")
+        const commentBtn = $("#commentBtn")
+        commentBtn.click(function () {
+          const content = commentContent.val()
+          if (!content || content.length > 512) {
+            toastr.error("评论内容长度要求在[1,512]之间")
+            return
+          }
+          // 提交评论
+          const params = {
+            // 文章id
+            articleId: articleId,
+            // 评论内容
+            commentContent: content,
+          }
+          post("/comment/api/post", params, function (data) {
+            // 使用 Ajax 的方式，直接更新评论列表
+            document.getElementById("commentDiv").innerHTML = data
+            bindCommentInputEvent()
+          })
+        });
+
+        // 直接评论监听
+        $(document).on("input propertychange", "#commentContent", function () {
+          const val = $(this).val()
+          console.log(val)
+          if (val) {
+            $("#commentBtn").attr("disabled", false).removeClass("c-btn-disabled")
+          } else {
+            $("#commentBtn").attr("disabled", true).addClass("c-btn-disabled")
+          }
+        })
+      }
+
+      // 回复
+      $(document).on("click", ".reply-comment", function () {
+        const currentDom = $(this)
+        createComment(currentDom)
+      })
+
+      // 回复编辑
+      $(document).on("click", ".hf-pl", function () {
+        const currentDom = $(this)
+        commentSubmit(currentDom)
+      })
+
+      $(document).on("input propertychange", ".hf-input", function () {
+        const currentDom = $(this)
+        listenCommentBtn(currentDom)
+      })
+
+      // 点击回复创建评论
+      const createComment = function (currentDom) {
+        // 移除其他回复
+        $(".hf-con").remove()
+
+        // 获取回复人的名字
+        var fhName = currentDom
+                .parents(".common-item-content")
+                .find(".comment-name")
+                .html()
+        //回复@
+        var fhN = "回复@" + fhName + "："
+        var fhHtml =
+                '<div class="hf-con pull-left"><textarea class="hf-input" placeholder="" "></textarea><button disabled class="hf-pl hf-pl--disabled">评论</button></div>'
+        if (currentDom.is(".hf-con-block")) {
+          const currentWrap =
+                  (currentDom.parents(".comment-item-wrap").length &&
+                          currentDom.parents(".comment-item-wrap")) ||
+                  (currentDom.parents(".comment-item-wrap-second").length &&
+                          currentDom.parents(".comment-item-wrap-second"))
+
+          currentWrap.find(".common-item-content").append(fhHtml)
+          currentDom.removeClass("hf-con-block")
+          //input框自动聚焦
+          currentDom
+                  .parents(".common-item-content")
+                  .find(".hf-input")
+                  .val("")
+                  .focus()
+                  .attr("placeholder", fhN)
+          // 取消回复
+          currentDom.find(".reply-comment-text").hide()
+          currentDom.find(".reply-comment-text-none").show()
+        } else {
+          currentDom.addClass("hf-con-block")
+          currentDom.parents(".common-item-content").find(".pull-left").remove()
+          // 回复
+          currentDom.find(".reply-comment-text").show()
+          currentDom.find(".reply-comment-text-none").hide()
+        }
+      }
+
+      // 评论编辑&提交
+      const commentSubmit = function (currentDom) {
+        const replyContent = currentDom.siblings(".hf-input")
+        const replyBtn = currentDom
+                .parents(".common-item-content")
+                .find(".reply-comment")
+
+        if (!replyContent.val()) {
+          toastr.error("回复内容不能为空")
+          return
+        }
+        // 提交评论
+        const params = {
+          // 文章id
+          articleId: $("#postsTitle").attr("data-id"),
+          // 评论内容
+          commentContent: replyContent.val(),
+          // 回复的评论id
+          parentCommentId: replyBtn.attr("data-reply-id"),
+          // 回复的一级评论id
+          topCommentId: replyBtn.attr("data-reply-top"),
+        }
+        post("/comment/api/post", params, function (data) {
+          // 对于侧边栏的评论回复
+          if (replyBtn.attr("data-reply-top")) {
+            // 刷新侧边的引用评论内容
+            showQuoteCommentWithComments(replyBtn.attr("data-reply-top"));
+          }
+
+          // 刷新底部评论的回复
+          document.getElementById("commentDiv").innerHTML = data
+          bindCommentInputEvent();
+        })
+      }
+
+      // 监听按钮
+      const listenCommentBtn = function (currentDom) {
+        if (!currentDom.val()) {
+          $(".hf-pl").attr("disabled", true).addClass("hf-pl--disabled")
+        } else {
+          $(".hf-pl").attr("disabled", false).removeClass("hf-pl--disabled")
+        }
+      }
+
+
+      bindCommentInputEvent();
+
+      function copyAndClose() {
+        // 复制短链
+        copyShortUrl();
+        // // 关闭弹窗，有个问题，关闭之后无法再次打开；先不关闭
+        // $('#shareModal').hide();
+      }
+      /*]]>*/
+    </script>
+  </body>
+</html>
